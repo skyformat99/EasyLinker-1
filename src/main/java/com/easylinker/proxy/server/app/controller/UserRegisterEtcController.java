@@ -86,27 +86,26 @@ public class UserRegisterEtcController {
                 appUser.setPassword(MD5Generator.EncodingMD5(password));
                 appUser.setEmail(email);
                 appUser.setPhone(phone);
-                //添加权限  默认新用户全部是 ROLE_USER 普通用户
-                appUserService.save(appUser);
+                try {
 
-                UserRole userRole = new UserRole();
-                userRole.setAppUser(appUser);
-                userRole.setRole("ROLE_USER");
-                userRoleService.save(userRole);
-                return ReturnResult.returnTipMessage(1, "注册成功!");
-//                try {
-//                    //emailSender.sendActiveUserAccountMail(appUser);
-//                    return ReturnResult.returnTipMessage(1, "注册成功!");
-//                } catch (Exception e) {
-//                    if (e instanceof SMTPAddressFailedException) {
-//                        return ReturnResult.returnTipMessage(0, "邮箱无效！请使用正确的邮箱!");
-//                    } else {
-//                        e.printStackTrace();
-//                        return ReturnResult.returnTipMessage(0, "邮箱无效！");
-//                    }
-//
-//
-//                }
+                    //emailSender.sendActiveMail(appUser);//发送激活邮件
+                    //添加权限  默认新用户全部是 ROLE_USER 普通用户
+                    appUserService.save(appUser);
+                    UserRole userRole = new UserRole();
+                    userRole.setAppUser(appUser);
+                    userRole.setRole("ROLE_USER");
+                    userRoleService.save(userRole);
+                    return ReturnResult.returnTipMessage(1, "注册成功!");
+                } catch (Exception e) {
+                    if (e instanceof SMTPAddressFailedException) {
+                        return ReturnResult.returnTipMessage(0, "邮箱无效！请使用正确的邮箱!");
+                    } else {
+                        e.printStackTrace();
+                        return ReturnResult.returnTipMessage(0, "服务器邮件发送失败,请联系管理员！");
+                    }
+
+
+                }
 
             }
         }
@@ -192,7 +191,7 @@ public class UserRegisterEtcController {
             return ReturnResult.returnTipMessage(0, "用户不存在!");
         } else {
             try {
-                emailSender.sendActiveUserAccountMail(appUser);
+                emailSender.sendActiveMail(appUser);
                 return ReturnResult.returnTipMessage(1, "邮件发送成功!");
             } catch (Exception e) {
                 return ReturnResult.returnTipMessage(0, "邮件发送失败!");
@@ -207,8 +206,8 @@ public class UserRegisterEtcController {
      * @param body
      * @return
      */
-    @RequestMapping(value = "/changePassword")
-    public JSONObject changePassword(@RequestBody JSONObject body) {
+    @RequestMapping(value = "/resetPassword")
+    public JSONObject resetPassword(@RequestBody JSONObject body) {
         String newPassword = body.getString("newPassword");
         String newPasswordRetry = body.getString("newPasswordRetry");
 
@@ -227,5 +226,63 @@ public class UserRegisterEtcController {
         }
     }
 
+    /**
+     * 忘记密码
+     *
+     * @return
+     */
+    @RequestMapping(value = "/forgetPassword")
+    public JSONObject forgetPassword(@RequestBody JSONObject body) {
+        String email = body.getString("email");
+        if (email != null) {
+            AppUser appUser = appUserService.getAAppUserWithParameter(email);
+            try {
+                if (appUser != null) {
+                    emailSender.sendForgetPasswordMail(appUser);
+                    return ReturnResult.returnTipMessage(1, "邮件发送成功!");
+
+                } else {
+                    return ReturnResult.returnTipMessage(0, "该邮箱对应的用户不存在!");
+                }
+
+            } catch (Exception e) {
+                //e.printStackTrace();
+                return ReturnResult.returnTipMessage(0, "邮件发送失败!");
+
+            }
+
+        } else {
+            return ReturnResult.returnTipMessage(1, "参数缺失!");
+
+        }
+
+    }
+
+    /**
+     * 找回密码
+     *
+     * @param
+     * @return
+     */
+
+    @RequestMapping(value = "/newPassword/{emailBase64}/{newPassword}/{newPasswordRetry}")
+    public JSONObject newPassword(@PathVariable String emailBase64, @PathVariable String newPassword, @PathVariable String newPasswordRetry) {
+
+        if (emailBase64 == null || newPassword == null || newPasswordRetry == null) {
+            return ReturnResult.returnTipMessage(0, "参数不全");
+        } else {
+            AppUser appUser = appUserService.getAAppUserWithParameter(Base64.getDecoder().decode(emailBase64.toString()).toString());
+            if (appUser != null) {
+                appUser.setPassword(MD5Generator.EncodingMD5(newPassword));
+                appUserService.save(appUser);
+                return ReturnResult.returnTipMessage(0, " 密码重置成功!");
+            } else {
+                return ReturnResult.returnTipMessage(0, " 用户不存在!");
+            }
+
+
+        }
+
+    }
 
 }

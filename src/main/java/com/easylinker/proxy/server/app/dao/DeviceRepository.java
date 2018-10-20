@@ -6,15 +6,13 @@ import com.easylinker.proxy.server.app.model.user.AppUser;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
 public interface DeviceRepository extends JpaRepository<Device, Long> {
     Device findTopById(Long id);
-
-    Device findTopByOpenId(Long openId);
-
-
     List<Device> findAllByAppUser(AppUser appUser);
 
     Page<Device> findAllByAppUser(AppUser appUser, Pageable pageable);
@@ -23,7 +21,26 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
 
     List<Device> findAllByAppUserAndIsOnline(AppUser appUser, Boolean online);
 
+    Page<Device> findAllByAppUserAndIsOnline(AppUser appUser, Boolean online,Pageable pageable);
+
     List<Device> findAllByIsOnline(Boolean online);
 
+
+    @Query("select id from Device ")
+    List<Long> findAllId();
+
+    /**
+     * 条件查询
+     *
+     * @param keyWords
+     * @return
+     */
+
+    @Query("select device from Device device where  device.deviceDescribe like %:keyWords%  or device.deviceName  like %:keyWords% ")
+    List<Device> searchDevice(@Param(value = "keyWords") String keyWords);
+
+
+    @Query("select device from Device device where ( device.deviceDescribe like %:keyWords%  or device.deviceName  like %:keyWords% ) and device.appUser = :appUser")
+    List<Device> searchDeviceByAppUser(@Param(value = "keyWords") String keyWords,@Param(value = "appUser")AppUser appUser);
 
 }

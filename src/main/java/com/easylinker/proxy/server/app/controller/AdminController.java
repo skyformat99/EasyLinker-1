@@ -2,19 +2,20 @@ package com.easylinker.proxy.server.app.controller;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.easylinker.proxy.server.app.model.daily.DailyLog;
 import com.easylinker.proxy.server.app.model.device.Device;
+import com.easylinker.proxy.server.app.model.device.DeviceData;
 import com.easylinker.proxy.server.app.model.device.DeviceGroup;
 import com.easylinker.proxy.server.app.model.device.Location;
 import com.easylinker.proxy.server.app.model.user.AppUser;
+import com.easylinker.proxy.server.app.service.*;
 import com.easylinker.proxy.server.app.utils.Image2Base64Tool;
 import com.easylinker.proxy.server.app.utils.QRCodeGenerator;
 import com.easylinker.proxy.server.app.constants.result.ReturnResult;
-import com.easylinker.proxy.server.app.service.AppUserService;
-import com.easylinker.proxy.server.app.service.DeviceGroupService;
-import com.easylinker.proxy.server.app.service.DeviceService;
-import com.easylinker.proxy.server.app.service.LocationService;
 import com.sun.javafx.geom.transform.BaseTransform;
 import io.netty.handler.codec.json.JsonObjectDecoder;
+import io.swagger.annotations.ApiImplicitParam;
+import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -39,7 +40,11 @@ public class AdminController {
     @Autowired
     DeviceGroupService deviceGroupService;
     @Autowired
+    DeviceDataService deviceDataService;
+    @Autowired
     AppUserService appUserService;
+    @Autowired
+    DailyLogService dailyLogService;
 
     /**
      * 管理员增加一个设备
@@ -48,6 +53,7 @@ public class AdminController {
      * @param deviceBody 包含设备信息的JSON
      * @return
      */
+
     @RequestMapping("/addADevice")
     public JSONObject addADevice(@RequestBody JSONObject deviceBody) {
         String deviceName = deviceBody.getString("deviceName");
@@ -143,6 +149,7 @@ public class AdminController {
                 device.setDeviceDescribe("Product_" + i);
                 device.setClientId(device.getId().toString());
                 //设置ACL  默认值
+
                 device.setTopic("IN/DEVICE/DEFAULT_USER/" + "DEFAULT_GROUP" + "/" + device.getId());
                 device.setBarCode(Image2Base64Tool.imageToBase64String(QRCodeGenerator.string2BarCode(device.getId().toString())));
                 device.setOpenId(device.getId().toString());
@@ -180,7 +187,7 @@ public class AdminController {
     @RequestMapping(value = "/getAllDevices/{page}/{size}", method = RequestMethod.GET)
     public JSONObject getAllDevices(@PathVariable int page, @PathVariable int size) {
         return ReturnResult.returnDataMessage(1, "查询成功!",
-                deviceService.getAllDevices(PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"))));
+                deviceService.getAllDevices(PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createTime"))));
 
     }
 
@@ -226,6 +233,7 @@ public class AdminController {
                         successCount += 1;
                         device.setAppUser(appUser);
                         device.setDeviceGroup(newGroup);
+                        device.setSecretKey(appUser.getId() + "-" + device.getDeviceGroup().getId() + "-" + device.getId());
                         device.setTopic("IN/DEVICE/" + appUser.getId() + "/" + newGroup.getId() + "/" + device.getId());
                         deviceService.save(device);
                     }
@@ -267,7 +275,7 @@ public class AdminController {
     public JSONObject getAllUsersByPage(@PathVariable int page, @PathVariable int size) {
 
         return ReturnResult.returnDataMessage(1, "获取成功!", appUserService.getAllUsersByPage(
-                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"))));
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createTime"))));
 
     }
 
@@ -279,9 +287,12 @@ public class AdminController {
      */
     @RequestMapping(value = "/getDeviceDetail/{deviceId}", method = RequestMethod.GET)
     public JSONObject getDeviceDetail(@PathVariable Long deviceId) {
-        return deviceService.getDeviceDetail(deviceId);
-
-
+        Device device = deviceService.findADevice(deviceId);
+        if (device != null) {
+            return ReturnResult.returnDataMessage(1, "查询成功!",deviceService.getDeviceDetail(deviceId));
+        } else {
+            return ReturnResult.returnTipMessage(0, "设备不存在!");
+        }
     }
 
 
@@ -291,7 +302,7 @@ public class AdminController {
     @RequestMapping(value = "/getAllGroupByPage/{page}/{size}", method = RequestMethod.GET)
     public JSONObject getAllGroupByPage(@PathVariable int page, @PathVariable int size) {
         return ReturnResult.returnDataMessage(1, "获取成功!",
-                deviceGroupService.getAllDeviceGroupByPage(PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"))));
+                deviceGroupService.getAllDeviceGroupByPage(PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createTime"))));
 
     }
 
@@ -315,5 +326,57 @@ public class AdminController {
         return ReturnResult.returnDataMessage(1, "查询成功!", data);
     }
 
+
+    @RequestMapping(value = "/deleteGroup/{id}", method = RequestMethod.DELETE)
+    public JSONObject deleteGroup(@PathVariable("id") Long id) {
+        DeviceGroup deviceGroup=deviceGroupService.findADeviceGroupById(id);
+        if (deviceGroup != null) {
+            deviceGroupService.delete(deviceGroupService.findADeviceGroupById(id));
+            return ReturnResult.returnTipMessage(1, "群组删除成功!");
+        } else {
+            return ReturnResult.returnTipMessage(0, "该群组不存在!");
+        }
+    }
+    /**
+     * 关键字搜索
+     */
+    @RequestMapping(value = "/search/{keyWords}", method = RequestMethod.POST)
+    public JSONObject search(@PathVariable String keyWords) {
+
+        return ReturnResult.returnDataMessage(1, "查询成功!", deviceService.search(keyWords));
+    }
+
+
+
+    /////////////////LOG//////////////////
+
+    /**
+     * 分页查询用户日志
+     * @param page
+     * @param size
+     * @return
+     */
+    @RequestMapping(value = "/getAllDailyLogByPage/{page}/{size}", method = RequestMethod.GET)
+    public JSONObject getAllDailyLogByPage(@PathVariable int page, @PathVariable int size) {
+
+        return ReturnResult.returnDataMessage(1, "获取成功!", dailyLogService.getAllDailyLogByPage(
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createTime"))));
+
+    }
+
+
+    /**
+     * 分页查询用户日志
+     * @param page
+     * @param size
+     * @return
+     */
+    @RequestMapping(value = "/getAllDeviceDataByPage/{page}/{size}", method = RequestMethod.GET)
+    public JSONObject getAllDeviceDataByPage(@PathVariable int page, @PathVariable int size) {
+
+        return ReturnResult.returnDataMessage(1, "获取成功!", deviceDataService.getAllDeviceDataByPage(
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createTime"))));
+
+    }
 
 }

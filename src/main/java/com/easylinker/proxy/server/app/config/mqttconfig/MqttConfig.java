@@ -1,10 +1,7 @@
 package com.easylinker.proxy.server.app.config.mqttconfig;
 
 import com.easylinker.proxy.server.app.config.mqttconfig.adapter.EMqttPahoMessageDrivenChannelAdapter;
-import com.easylinker.proxy.server.app.config.mqttconfig.handler.ClientCmdReplyMessageHandler;
-import com.easylinker.proxy.server.app.config.mqttconfig.handler.ClientOnAndOfflineWillMessageHandler;
-import com.easylinker.proxy.server.app.config.mqttconfig.handler.InMessageHandler;
-import com.easylinker.proxy.server.app.config.mqttconfig.handler.RealTimeMessageHandler;
+import com.easylinker.proxy.server.app.config.mqttconfig.handler.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,7 +38,8 @@ public class MqttConfig {
     ClientCmdReplyMessageHandler clientCmdReplyMessageHandler;
     @Autowired
     RealTimeMessageHandler realTimeMessageHandler;
-
+    @Autowired
+    LocationMessageHandler locationMessageHandler;
 
     /**
      * mqtt 的工厂  用来创建mqtt连接
@@ -65,7 +63,7 @@ public class MqttConfig {
      */
     @Bean("MqttClientOnOrOffLineMessageListenerInbound")
     public MessageProducerSupport getMqttClientOnOrOffLineMessageListener() {
-        MqttPahoMessageDrivenChannelAdapter adapter = new EMqttPahoMessageDrivenChannelAdapter(
+        EMqttPahoMessageDrivenChannelAdapter adapter = new EMqttPahoMessageDrivenChannelAdapter(
                 "MqttClientOnOrOffLineMessageListenerInbound",
                 mqttClientFactory());
         adapter.addTopic("$SYS/brokers/+/clients/+/#");//监控设备消息上下线
@@ -96,7 +94,7 @@ public class MqttConfig {
      */
     @Bean("MqttClientInMessageListenerInbound")
     public MessageProducerSupport getMqttClientInMessageListener() {
-        MqttPahoMessageDrivenChannelAdapter adapter = new EMqttPahoMessageDrivenChannelAdapter(
+        EMqttPahoMessageDrivenChannelAdapter adapter = new EMqttPahoMessageDrivenChannelAdapter(
                 "MqttClientInMessageListenerInbound",
                 mqttClientFactory());
         //OUT/DEVICE/DEFAULT_USER/DEFAULT_GROUP/ID  为客户端SUB的TOPIC
@@ -129,8 +127,8 @@ public class MqttConfig {
      */
 
     @Bean("ClientCmdReplyMessageHandler")
-    public MqttPahoMessageDrivenChannelAdapter getClientCmdReplyMessageHandler() {
-        MqttPahoMessageDrivenChannelAdapter adapter = new EMqttPahoMessageDrivenChannelAdapter(
+    public EMqttPahoMessageDrivenChannelAdapter getClientCmdReplyMessageHandler() {
+        EMqttPahoMessageDrivenChannelAdapter adapter = new EMqttPahoMessageDrivenChannelAdapter(
                 "ClientCmdReplyMessageHandler",
                 mqttClientFactory());
         //CMD/IN/所有命令回复
@@ -161,8 +159,8 @@ public class MqttConfig {
      */
 
     @Bean("RealTimeMessageHandler")
-    public MqttPahoMessageDrivenChannelAdapter getRealTimeMessageHandler() {
-        MqttPahoMessageDrivenChannelAdapter adapter = new EMqttPahoMessageDrivenChannelAdapter(
+    public EMqttPahoMessageDrivenChannelAdapter getRealTimeMessageHandler() {
+        EMqttPahoMessageDrivenChannelAdapter adapter = new EMqttPahoMessageDrivenChannelAdapter(
                 "RealTimeMessageHandler",
                 mqttClientFactory());
         adapter.addTopic("OUT/REAL_TIME/#");//实时消息
@@ -181,6 +179,34 @@ public class MqttConfig {
     public IntegrationFlow mqttRealTimeMessageInflow() {
         return IntegrationFlows.from(getRealTimeMessageHandler())
                 .handle(realTimeMessageHandler)
+                .get();
+    }
+
+    /**
+     * 监听地理位置变化
+     *
+     */
+    @Bean("LocationMessageHandler")
+    public EMqttPahoMessageDrivenChannelAdapter getLocationMessageHandler() {
+        EMqttPahoMessageDrivenChannelAdapter adapter = new EMqttPahoMessageDrivenChannelAdapter(
+                "LocationMessageHandler",
+                mqttClientFactory());
+        adapter.addTopic("IN/LOCATION/#");
+        adapter.setCompletionTimeout(5000);
+        adapter.setConverter(new DefaultPahoMessageConverter());
+        adapter.setQos(1);
+        return adapter;
+    }
+
+    /**
+     *
+     * @return
+     */
+
+    @Bean("mqttLocationMessageInflow")
+    public IntegrationFlow mqttLocationMessageInflow() {
+        return IntegrationFlows.from(getLocationMessageHandler())
+                .handle(locationMessageHandler)
                 .get();
     }
 

@@ -28,13 +28,18 @@ public class Device extends BaseEntity {
     @OneToOne(targetEntity = Location.class, fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private Location location;
 
+
     @ManyToOne(targetEntity = DeviceGroup.class, fetch = FetchType.LAZY)
     private DeviceGroup deviceGroup;
+    private String secretKey = "-.-.-";
 
+    public String getSecretKey() {
+        return secretKey;
+    }
 
-//
-//    @OneToMany(targetEntity = AudioData.class, fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-//    private List<AudioData> audioDataList;
+    public void setSecretKey(String scretKey) {
+        this.secretKey = scretKey;
+    }
 
     private String topic;
     @JSONField(serialize = false)
@@ -43,7 +48,6 @@ public class Device extends BaseEntity {
 
 
     private Date lastActiveDate;
-
 
     public Date getLastActiveDate() {
         return lastActiveDate;
@@ -156,6 +160,5 @@ public class Device extends BaseEntity {
     public void setLocation(Location location) {
         this.location = location;
     }
-
 
 }
